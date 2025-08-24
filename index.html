@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกมจิ๊กซอว์อุปกรณ์คอมพิวเตอร์</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 20px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 900px;
+            width: 100%;
+        }
+        .section {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+        }
+        #lobby {
+            display: flex;
+        }
+        #game-layout {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        #puzzle-grid, #puzzle-pieces-container {
+            display: grid;
+            border: 2px solid #333;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            width: 400px;
+            height: 400px;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+        }
+        .drop-zone {
+            width: 100%;
+            height: 100%;
+            border: 1px dashed #ccc;
+            box-sizing: border-box;
+            background-color: #f9f9f9;
+        }
+        .drop-zone.hover {
+            border-color: #007bff;
+            background-color: #e6f7ff;
+        }
+        .puzzle-piece {
+            background-size: 400px 400px;
+            box-sizing: border-box;
+            cursor: grab;
+            transition: transform 0.1s;
+        }
+        #game-info {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+        #game-info h3 {
+            margin: 5px 0;
+        }
+        #game-info #timer {
+            font-weight: bold;
+            color: #d9534f;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            background-color: #007bff;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>เกมจิ๊กซอว์อุปกรณ์คอมพิวเตอร์</h1>
+
+        <div id="lobby" class="section">
+            <h2>ลงทะเบียนผู้เล่น</h2>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="playerNameInput" placeholder="กรอกชื่อของคุณ" required>
+                <button id="startBtn" onclick="startRace()">เริ่มเล่น</button>
+            </div>
+        </div>
+
+        <div id="game" class="section">
+            <h2 id="gameStatus">เตรียมตัวให้พร้อม!</h2>
+            <div id="game-info">
+                <h3>เวลา: <span id="timer">0.00</span> วินาที</h3>
+                <p>เป้าหมาย: ลากชิ้นส่วนไปวางในช่องว่างให้เป็นภาพที่สมบูรณ์</p>
+            </div>
+            
+            <div id="game-layout">
+                <div>
+                    <h4>ภาพตัวอย่าง</h4>
+                    <img id="sample-image" src="" alt="ภาพตัวอย่าง" style="width: 400px; height: 400px; border: 2px solid #333;">
+                </div>
+                <div>
+                    <h4>ตารางจิ๊กซอว์</h4>
+                    <div id="puzzle-grid"></div>
+                </div>
+                <div>
+                    <h4>ชิ้นส่วน</h4>
+                    <div id="puzzle-pieces-container"></div>
+                </div>
+            </div>
+            <button id="submitBtn" onclick="submitPuzzle()" disabled>ส่งคำตอบ</button>
+        </div>
+
+        <div id="scoreboard" class="section">
+            <h2>ผลการแข่งขัน</h2>
+            <h3 id="playerScoreTime"></h3>
+            <div class="button-group">
+                <button onclick="resetGame()">เล่นใหม่อีกครั้ง</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const lobbyEl = document.getElementById('lobby');
+        const gameEl = document.getElementById('game');
+        const scoreboardEl = document.getElementById('scoreboard');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const startBtn = document.getElementById('startBtn');
+        const sampleImageEl = document.getElementById('sample-image');
+        const puzzleGridEl = document.getElementById('puzzle-grid');
+        const puzzlePiecesContainerEl = document.getElementById('puzzle-pieces-container');
+        const timerEl = document.getElementById('timer');
+        const gameStatusEl = document.getElementById('gameStatus');
+        const submitBtn = document.getElementById('submitBtn');
+        const playerScoreTimeEl = document.getElementById('playerScoreTime');
+
+        // --- Game State Variables ---
+        const images = [
+            './images/A1.jpg', './images/A2.jpg', './images/A3.jpg',
+            './images/A4.jpg', './images/A5.jpg', './images/A6.jpg',
+            './images/A7.jpg', './images/A8.jpg', './images/A9.jpg',
+            './images/A10.jpg', './images/A11.jpg', './images/A12.jpg',
+            './images/cpu.jpg', './images/kb.jpg', './images/mo.jpg',
+            './images/prt.jpg', './images/prt.jpg', './images/tab.jpg'
+        ];
+        
+        let selectedImage = '';
+        let timerInterval;
+        let startTime;
+        let currentPlayerName = '';
+        let draggedElement = null;
+
+        // --- Step 1: Game Start & Initialization ---
+        function startRace() {
+            // --- [แก้ไข] ดึงชื่อผู้เล่นและตรวจสอบค่าว่าง ---
+            currentPlayerName = playerNameInput.value.trim();
+            if (currentPlayerName === '') {
+                alert('กรุณากรอกชื่อของคุณ!');
+                return;
+            }
+
+            if (images.length === 0) {
+                alert('ไม่พบภาพในโฟลเดอร์ images!');
+                return;
+            }
+            
+            // --- [แก้ไข] ปิดการใช้งานปุ่มและช่องกรอกชื่อ ---
+            playerNameInput.disabled = true;
+            startBtn.disabled = true;
+
+            lobbyEl.style.display = 'none';
+            gameEl.style.display = 'flex';
+            
+            selectedImage = images[Math.floor(Math.random() * images.length)];
+            sampleImageEl.src = selectedImage;
+            
+            const puzzleSize = 3;
+            createPuzzleGrid(puzzleSize);
+            createDraggablePieces(puzzleSize);
+            
+            let countdown = 3;
+            gameStatusEl.textContent = `เกมจะเริ่มใน ${countdown}...`;
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    gameStatusEl.textContent = `เกมจะเริ่มใน ${countdown}...`;
+                } else {
+                    clearInterval(countdownInterval);
+                    gameStatusEl.textContent = `เริ่มได้!`;
+                    submitBtn.disabled = false;
+                    startGameTimer();
+                }
+            }, 1000);
+        }
+
+        function createPuzzleGrid(size) {
+            puzzleGridEl.innerHTML = '';
+            for (let i = 0; i < size * size; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('drop-zone');
+                cell.dataset.correctIndex = i;
+                cell.addEventListener('dragover', handleDragOver);
+                cell.addEventListener('drop', handleDrop);
+                cell.addEventListener('dragenter', handleDragEnter);
+                cell.addEventListener('dragleave', handleDragLeave);
+                puzzleGridEl.appendChild(cell);
+            }
+        }
+        
+        function createDraggablePieces(size) {
+            puzzlePiecesContainerEl.innerHTML = '';
+            const pieces = [];
+            const tileSize = 400 / size;
+            
+            for (let i = 0; i < size * size; i++) {
+                const piece = document.createElement('div');
+                piece.classList.add('puzzle-piece');
+                piece.draggable = true;
+                piece.dataset.correctIndex = i;
+                piece.style.width = `${tileSize}px`;
+                piece.style.height = `${tileSize}px`;
+                piece.style.backgroundImage = `url(${selectedImage})`;
+                piece.style.backgroundPosition = `-${(i % size) * tileSize}px -${Math.floor(i / size) * tileSize}px`;
+                piece.addEventListener('dragstart', handleDragStart);
+                pieces.push(piece);
+            }
+            
+            shuffle(pieces);
+            pieces.forEach(piece => {
+                const dropZone = document.createElement('div');
+                dropZone.classList.add('drop-zone');
+                dropZone.addEventListener('dragover', handleDragOver);
+                dropZone.addEventListener('drop', handleDrop);
+                dropZone.addEventListener('dragenter', handleDragEnter);
+                dropZone.addEventListener('dragleave', handleDragLeave);
+                dropZone.appendChild(piece);
+                puzzlePiecesContainerEl.appendChild(dropZone);
+            });
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+        
+        // --- Drag & Drop Handlers ---
+        function handleDragStart(event) {
+            draggedElement = event.target;
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+        }
+        
+        function handleDragEnter(event) {
+            const target = event.target.closest('.drop-zone');
+            if(target) target.classList.add('hover');
+        }
+
+        function handleDragLeave(event) {
+            const target = event.target.closest('.drop-zone');
+            if(target) target.classList.remove('hover');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            const dropZone = event.target.closest('.drop-zone');
+            if (!dropZone) return;
+
+            dropZone.classList.remove('hover');
+
+            if (dropZone.children.length === 0) {
+                // วางในช่องว่าง
+                draggedElement.parentNode.removeChild(draggedElement);
+                dropZone.appendChild(draggedElement);
+            } else {
+                // สลับตำแหน่ง
+                const targetPiece = dropZone.children[0];
+                const sourceZone = draggedElement.parentNode;
+                
+                targetPiece.parentNode.appendChild(draggedElement);
+                sourceZone.appendChild(targetPiece);
+            }
+        }
+
+        // --- Timer & Submission ---
+        function startGameTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 100);
+        }
+
+        function updateTimer() {
+            const elapsed = (Date.now() - startTime) / 1000;
+            timerEl.textContent = elapsed.toFixed(2);
+        }
+
+        function submitPuzzle() {
+            if (!isSolved()) {
+                alert('จิ๊กซอว์ยังไม่สมบูรณ์! ลองใหม่อีกครั้ง');
+                return;
+            }
+
+            clearInterval(timerInterval);
+            const playerTime = (Date.now() - startTime) / 1000;
+            
+            gameStatusEl.textContent = 'ยินดีด้วย คุณทำสำเร็จ!';
+            submitBtn.disabled = true;
+            
+            showScoreboard(playerTime);
+        }
+
+        function isSolved() {
+            const dropZones = puzzleGridEl.children;
+            for (let i = 0; i < dropZones.length; i++) {
+                const zone = dropZones[i];
+                if (zone.children.length === 0) return false; // มีช่องว่าง
+                
+                const piece = zone.children[0];
+                if (parseInt(piece.dataset.correctIndex) !== parseInt(zone.dataset.correctIndex)) {
+                    return false; // ตำแหน่งไม่ถูกต้อง
+                }
+            }
+            return true;
+        }
+
+        // --- Scoreboard & Reset ---
+        function showScoreboard(playerTime) {
+            gameEl.style.display = 'none';
+            scoreboardEl.style.display = 'flex';
+            
+            playerScoreTimeEl.textContent = `คุณ ${currentPlayerName} ใช้เวลา: ${playerTime.toFixed(2)} วินาที`;
+        }
+        
+        // --- [แก้ไข] ปรับปรุงฟังก์ชัน Reset ---
+        function resetGame() {
+            // ซ่อนหน้าเกมและคะแนน
+            gameEl.style.display = 'none';
+            scoreboardEl.style.display = 'none';
+
+            // กลับไปหน้า Lobby
+            lobbyEl.style.display = 'flex';
+
+            // รีเซ็ตค่าต่างๆ
+            clearInterval(timerInterval);
+            timerEl.textContent = "0.00";
+            currentPlayerName = '';
+            puzzleGridEl.innerHTML = '';
+            puzzlePiecesContainerEl.innerHTML = '';
+            
+            // เปิดให้กรอกชื่อและกดปุ่มได้อีกครั้ง
+            playerNameInput.value = '';
+            playerNameInput.disabled = false;
+            startBtn.disabled = false;
+        }
+    </script>
+</body>
+</html>
